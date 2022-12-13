@@ -11,7 +11,8 @@ jobs:
           fetch-depth: 2
       - id: diff
         run: |
-          diff=$(python3 diff.py)
+          git fetch origin main
+          diff=$(git diff origin/main)
           echo "DIFF=$(echo $diff)" >> $GITHUB_ENV
       - id: review
         uses: samjhill/GPTReview@main
