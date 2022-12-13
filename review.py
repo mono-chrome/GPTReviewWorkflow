@@ -2,7 +2,6 @@ import os
 import requests
 import json
 import subprocess
-
 import openai
 
 
@@ -19,7 +18,6 @@ def get_review():
     "Accept": "application/vnd.github.v3.patch",
     "authorization": f"Bearer {ACCESS_TOKEN}"
   }
-
 
   intro = f"\n Here is a pull request. Please assume you are a reviewer of this PR. First I will tell you the title and body of the PR. \n"
   pr_title = f"The title is {PR_TITLE}.\n"
