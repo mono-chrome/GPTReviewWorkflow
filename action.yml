@@ -41,6 +41,10 @@ runs:
           python -m pip install -U pip
           pip install openai
           pip install requests
+      - name: Fetch review logic
+        uses: wei/wget@v1
+        with:
+          args: -O review.py https://raw.githubusercontent.com/samjhill/GPTReview/main/review.py
       - name: Review PR and make comment
         shell: bash
         run: |
