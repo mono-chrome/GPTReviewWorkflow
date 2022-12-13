@@ -13,6 +13,7 @@ jobs:
         run: |
           git fetch origin main
           diff=$(git diff origin/main)
+          echo $diff
           echo "DIFF=$(echo $diff)" >> $GITHUB_ENV
       - id: review
         uses: samjhill/GPTReview@main
