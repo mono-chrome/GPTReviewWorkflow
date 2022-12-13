@@ -25,8 +25,8 @@ def get_review():
   pr_title = f"The title is {PR_TITLE}.\n"
   pr_body = f"The body is {PR_BODY}.\n"
   question = "Can you tell me the problems with the following pull request and provide specific suggestions to improve it?"
-  pr_diff = f"Here's the diff of what changed in this PR: {diff_result}"
-  prompt = intro + pr_title + pr_body + question + PR_DIFF
+  diff = f"Here's the diff of what changed in this PR: {PR_DIFF}"
+  prompt = intro + pr_title + pr_body + question + diff
 
   print(f"prompt: {prompt}")
 
