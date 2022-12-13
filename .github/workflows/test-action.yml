@@ -6,6 +6,9 @@ jobs:
     name: Test if the action works
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
       - id: diff
         run: |
           diff=$(python3 diff.py)
