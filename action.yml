@@ -28,10 +28,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: ${{ inputs.PR_NUMBER }}
-          fetch-depth: 2
       - name: Set up Python 3.8
         uses: actions/setup-python@v2
         with:
