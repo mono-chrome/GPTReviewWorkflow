@@ -8,6 +8,7 @@ import openai
 def get_review():
   pr_link = os.getenv("LINK")
   openai.api_key = os.getenv("OPENAI_API_KEY")
+  openai.organization = os.getenv("OPENAI_ORG_KEY")
   ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
   GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
   PR_TITLE = os.getenv("PR_TITLE")
@@ -22,7 +23,7 @@ def get_review():
   intro = f"Here is a pull request. Please assume you are a reviewer of this PR. First I will tell you the title and body of the PR.\n"
   pr_title = f"The title is {PR_TITLE}.\n"
   pr_body = f"The body is {PR_BODY}.\n"
-  question = "Can you tell me the problems and bugs with the following pull request and provide specific suggestions to improve it?\n"
+  question = "Can you tell me the problems and bugs with the following pull request and provide specific suggestions to improve it? Afterwards your explanation please provide a short summary response in structured Markdown language using headings and lists.\n"
   diff = f"Here's the diff of what changed in this PR: {PR_DIFF}"
   prompt = intro + pr_title + pr_body + question + diff
 
@@ -33,8 +34,8 @@ def get_review():
   response = openai.Completion.create(
     engine=model,
     prompt=prompt,
-    temperature=0.6,
-    max_tokens=318,
+    temperature=0.5,
+    max_tokens=324,
     top_p=1.0,
     frequency_penalty=0.0,
     presence_penalty=0.0
