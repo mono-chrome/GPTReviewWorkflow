@@ -20,6 +20,7 @@ jobs:
         uses: mono-chrome/GPTReviewWorkflow@main
         with:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_ORG_KEY: ${{ secrets.OPENAI_ORG_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_COMMIT_HASH: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
