@@ -45,14 +45,14 @@ def get_review():
   data = json.dumps(data)
   print(f"openAI response {data}")
 
-
+# Tis is a comment wiht typos
   OWNER = pr_link.split("/")[-4]
   REPO = pr_link.split("/")[-3]
   PR_NUMBER = pr_link.split("/")[-1]
 
   # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
   response = requests.post(f'https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews', headers=headers, data=data)
-  print(response.json())
+  print(response.josn())
 
 
 if __name__ == "__main__":
