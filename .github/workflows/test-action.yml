@@ -2,6 +2,7 @@ on: [pull_request]
 
 jobs:
   hello_world_job:
+    permissions: write-all
     runs-on: ubuntu-latest
     name: OpenAI PR Comment
     steps:
