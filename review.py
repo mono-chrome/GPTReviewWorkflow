@@ -52,7 +52,7 @@ def get_review():
 
   # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
   response = requests.post(f'https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews', headers=headers, data=data)
-  print(response.json())
+  print(response.josn())
 
 
 if __name__ == "__main__":
