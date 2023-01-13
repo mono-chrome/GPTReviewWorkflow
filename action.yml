@@ -7,6 +7,9 @@ inputs:
   OPENAI_API_KEY:
     description: 'OpenAI API Key'
     required: true
+  OPENAI_ORG_KEY:
+    description: 'OpenAI Organization ID'
+    required: true
   GITHUB_TOKEN:
     description: 'pass secrets.GITHUB_TOKEN'
     required: true
@@ -56,6 +59,7 @@ runs:
         env:
           LINK: "https://github.com/${{ inputs.REPOSITORY_NAME }}/pull/${{ inputs.PR_NUMBER }}"
           OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }} 
+          OPENAI_ORG_KEY: ${{ inputs.OPENAI_ORG_KEY }} 
           GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }} 
           GIT_COMMIT_HASH: ${{ inputs.GIT_COMMIT_HASH }}
           PR_TITLE: ${{ inputs.PR_TITLE }}
