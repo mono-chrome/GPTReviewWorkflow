@@ -3,7 +3,7 @@ on: [pull_request]
 jobs:
   hello_world_job:
     runs-on: ubuntu-latest
-    name: Test if the action works
+    name: OpenAI PR Comment
     steps:
       - uses: actions/checkout@v3
         with:
@@ -16,7 +16,7 @@ jobs:
           echo $diff
           echo "DIFF=$(echo $diff)" >> $GITHUB_ENV
       - id: review
-        uses: samjhill/GPTReview@main
+        uses: mono-chrome/GPTReviewWorkflow@main
         with:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
