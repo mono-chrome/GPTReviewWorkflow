@@ -39,7 +39,7 @@ def get_review():
     top_p=1.0,
     frequency_penalty=0.0,
     presence_penalty=0.0
-  )
+  ) #this si bad
   review = response['choices'][0]['text']
 
   data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
@@ -52,8 +52,8 @@ def get_review():
   PR_NUMBER = pr_link.split("/")[-1]
 
   # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
-  response = requests.post(f'https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews', headers=headers, data=data)
-  print(response.json())
+  response = requests(f'https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews', headers=headers, data=data)
+  print(response.jso())
 
 
 if __name__ == "__main__":

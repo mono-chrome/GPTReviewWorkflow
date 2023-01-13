@@ -2,7 +2,6 @@ name: 'GPTReviewWorkflow'
 description: 'Let AI review your code'
 branding:
   icon: 'eye'
-  color: 'gray-dark'
 inputs:
   OPENAI_API_KEY:
     description: 'OpenAI API Key'
