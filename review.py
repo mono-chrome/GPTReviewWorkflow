@@ -19,22 +19,22 @@ def get_review():
     "authorization": f"Bearer {ACCESS_TOKEN}"
   }
 
-  intro = f"\n Here is a pull request. Please assume you are a reviewer of this PR. First I will tell you the title and body of the PR. \n"
+  intro = f"Here is a pull request. Please assume you are a reviewer of this PR. First I will tell you the title and body of the PR.\n"
   pr_title = f"The title is {PR_TITLE}.\n"
   pr_body = f"The body is {PR_BODY}.\n"
-  question = "Can you tell me the problems with the following pull request and provide specific suggestions to improve it?"
+  question = "Can you tell me the problems and bugs with the following pull request and provide specific suggestions to improve it?\n"
   diff = f"Here's the diff of what changed in this PR: {PR_DIFF}"
   prompt = intro + pr_title + pr_body + question + diff
 
-  print(f"prompt: {prompt}")
+  print(f"Prompt sent to OpenAI: {prompt}")
 
   # model = "text-ada-001"
   model = "text-davinci-003"
   response = openai.Completion.create(
     engine=model,
     prompt=prompt,
-    temperature=0.5,
-    max_tokens=256,
+    temperature=0.6,
+    max_tokens=318,
     top_p=1.0,
     frequency_penalty=0.0,
     presence_penalty=0.0
@@ -43,7 +43,7 @@ def get_review():
 
   data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
   data = json.dumps(data)
-  print(f"openAI response {data}")
+  print(f"Response from OpenAI: {data}")
 
 
   OWNER = pr_link.split("/")[-4]
