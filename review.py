@@ -29,7 +29,6 @@ def get_review():
 
   print(f"Prompt sent to OpenAI: {prompt}")
 
-  # model = "text-ada-001"
   model = "text-davinci-003"
   response = openai.Completion.create(
     engine=model,
@@ -45,7 +44,6 @@ def get_review():
   data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
   data = json.dumps(data)
   print(f"Response from OpenAI: {data}")
-
 
   OWNER = pr_link.split("/")[-4]
   REPO = pr_link.split("/")[-3]
