@@ -23,10 +23,10 @@ def get_review():
     explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"
     patch_info = f"Patch of the Pull Request to review:\n\n{PR_PATCH}\n"
     task_headline = f"As a code reviewer, your task is:\n"
-    task_list = f"- Review the code changes (diffs) in the patch and provide feedback.\n- If there are any bugs, highlight them.\n - Do not highlight minor issues and nitpicks.\n - Look out for typos in repeating variables.\n - Use markdown formatting.\n - Use bullet points if you have multiple comments.\n"
+    task_list = f"- Review the code changes (diffs) and provide feedback.\n- If there are any bugs, highlight them.\n- Do not highlight minor issues and nitpicks.\n- View this as one pull request and don't mention individual patches.\n- Look out for typos in repeating variables.\n- Use markdown formatting.\n- Use bullet points if you have multiple comments.\n"
     prompt = intro + explanation + patch_info + task_headline + task_list
 
-    print(f"Prompt sent to GPT-3: {prompt}")
+    print(f"\nPrompt sent to GPT-3: {prompt}\n")
 
     response = openai.Completion.create(
         engine=model,
@@ -41,7 +41,7 @@ def get_review():
 
     data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
     data = json.dumps(data)
-    print(f"\n\nResponse from GPT-3: {data}\n\n")
+    print(f"\nResponse from GPT-3: {data}\n")
 
     OWNER = pr_link.split("/")[-4]
     REPO = pr_link.split("/")[-3]
