@@ -60,3 +60,5 @@ runs:
           OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }} 
           OPENAI_ORG_KEY: ${{ inputs.OPENAI_ORG_KEY }} 
           PR_TITLE: ${{ inputs.PR_TITLE }}
+          GIT_PATCH_OUTPUT: ${{ inputs.GIT_PATCH_OUTPUT }}
+
