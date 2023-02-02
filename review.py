@@ -1,58 +1,60 @@
 import os
 import requests
 import json
-import subprocess #is this still needed?
+import subprocess  # is this still needed?
 import openai
 
 
 def get_review():
-  pr_link = os.getenv("LINK")
-  openai.api_key = os.getenv("OPENAI_API_KEY")
-  openai.organization = os.getenv("OPENAI_ORG_KEY")
-  ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
-  GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
-  PR_TITLE = os.getenv("PR_TITLE")
-  PR_BODY = os.getenv("PR_BODY")
-  PR_DIFF = os.getenv("DIFF")
+    ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
+    GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
+    PR_PATCH = os.getenv("GIT_PATCH_OUTPUT")
+    model = "text-davinci-003"
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    openai.organization = os.getenv("OPENAI_ORG_KEY")
+    pr_link = os.getenv("LINK")
 
-  headers = {
-    "Accept": "application/vnd.github.v3.patch",
-    "authorization": f"Bearer {ACCESS_TOKEN}"
-  }
+    headers = {
+        "Accept": "application/vnd.github.v3.patch",
+        "authorization": f"Bearer {ACCESS_TOKEN}",
+    }
 
-  intro = f"Here is a pull request. Please assume you are a reviewer of this PR. First I will tell you the title and body of the PR.\n"
-  pr_title = f"The title is {PR_TITLE}.\n"
-  pr_body = f"The body is {PR_BODY}.\n"
-  question = "Can you tell me the problems and bugs with the following pull request and provide specific suggestions to improve it? Afterwards your explanation please provide a short summary response in structured Markdown language using headings and lists.\n"
-  diff = f"Here's the diff of what changed in this PR: {PR_DIFF}"
-  prompt = intro + pr_title + pr_body + question + diff
+    intro = f"Act as a code reviewer of a Pull Request, providing feedback on the code changes below. You are provided with the Pull Request changes in a patch format.\n"
+    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"
+    patch_info = f"Patch of the Pull Request to review:\n\n{PR_PATCH}\n"
+    task_headline = f"As a code reviewer, your task is:\n"
+    task_list = f"- Review the code changes (diffs) in the patch and provide feedback.\n- If there are any bugs, highlight them.\n - Do not highlight minor issues and nitpicks.\n - Look out for typos in repeating variables.\n - Use markdown formatting.\n - Use bullet points if you have multiple comments.\n"
+    prompt = intro + explanation + patch_info + task_headline + task_list
 
-  print(f"Prompt sent to OpenAI: {prompt}")
+    print(f"Prompt sent to GPT-3: {prompt}")
 
-  model = "text-davinci-003"
-  response = openai.Completion.create(
-    engine=model,
-    prompt=prompt,
-    temperature=0.5,
-    max_tokens=324,
-    top_p=1.0,
-    frequency_penalty=0.0,
-    presence_penalty=0.0
-  )
-  review = response['choices'][0]['text']
+    response = openai.Completion.create(
+        engine=model,
+        prompt=prompt,
+        temperature=0.55,
+        max_tokens=312,
+        top_p=1,
+        frequency_penalty=0.3,
+        presence_penalty=0.0,
+    )
+    review = response["choices"][0]["text"]
 
-  data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
-  data = json.dumps(data)
-  print(f"Response from OpenAI: {data}")
+    data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
+    data = json.dumps(data)
+    print(f"\n\nResponse from GPT-3: {data}\n\n")
 
-  OWNER = pr_link.split("/")[-4]
-  REPO = pr_link.split("/")[-3]
-  PR_NUMBER = pr_link.split("/")[-1]
+    OWNER = pr_link.split("/")[-4]
+    REPO = pr_link.split("/")[-3]
+    PR_NUMBER = pr_link.split("/")[-1]
 
-  # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
-  response = requests.post(f'https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews', headers=headers, data=data)
-  print(response.json())
+    # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
+    response = requests.post(
+        f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews",
+        headers=headers,
+        data=data,
+    )
+    print(response.json())
 
 
 if __name__ == "__main__":
-  get_review()
+    get_review()

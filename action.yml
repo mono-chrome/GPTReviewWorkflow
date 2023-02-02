@@ -1,35 +1,32 @@
 name: 'GPTReviewWorkflow'
-description: 'Let AI review your code'
+description: 'GPT-3 reviews your PR'
 branding:
   icon: 'eye'
   color: 'gray-dark'
 inputs:
+  GIT_COMMIT_HASH:
+    description: 'SHA of the pull request-head to attach a review comment'
+    required: true
+  GIT_PATCH_OUTPUT:
+    description: 'The pull request in patch format for prompt interpretation'
+    required: true
+  GITHUB_TOKEN:
+    description: 'Derivative token for using the GitHub REST API'
+    required: true
   OPENAI_API_KEY:
     description: 'OpenAI API Key'
     required: true
   OPENAI_ORG_KEY:
     description: 'OpenAI Organization ID'
     required: true
-  GITHUB_TOKEN:
-    description: 'pass secrets.GITHUB_TOKEN'
-    required: true
-  GIT_COMMIT_HASH:
-    description: 'pass github.event.pull_request.head.sha'
+  PR_NUMBER:
+    description: 'The pull request id (ie: 17)'
     required: true
   PR_TITLE:
-    description: 'pass github.event.pull_request.title'
-    required: true
-  PR_BODY:
-    description: 'pass github.event.pull_request.body'
+    description: 'The pull request title'
     required: true
   REPOSITORY_NAME:
-    description: 'pass github.repository'
-    required: true
-  PR_NUMBER:
-    description: 'pass github.event.pull_request.number'
-    required: true
-  DIFF:
-    description: 'what has changed between PRs'
+    description: 'The repository name (ie: octocat/hello-world)'
     required: true
 runs:
   using: "composite"
@@ -57,10 +54,9 @@ runs:
           source .env/bin/activate
           python review.py
         env:
+          GIT_COMMIT_HASH: ${{ inputs.GIT_COMMIT_HASH }}
+          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }} 
           LINK: "https://github.com/${{ inputs.REPOSITORY_NAME }}/pull/${{ inputs.PR_NUMBER }}"
           OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }} 
           OPENAI_ORG_KEY: ${{ inputs.OPENAI_ORG_KEY }} 
-          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }} 
-          GIT_COMMIT_HASH: ${{ inputs.GIT_COMMIT_HASH }}
           PR_TITLE: ${{ inputs.PR_TITLE }}
-          PR_BODY: ${{ inputs.PR_BODY }}
