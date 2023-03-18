@@ -29,7 +29,7 @@ jobs:
           GIT_PATCH_OUTPUT: ${{ env.GIT_PATCH_OUTPUT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_ORG_KEY: ${{ secrets.OPENAI_ORG_KEY }}
+          // OPENAI_ORG_KEY: ${{ secrets.OPENAI_ORG_KEY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPOSITORY_NAME: ${{ github.repository }}
