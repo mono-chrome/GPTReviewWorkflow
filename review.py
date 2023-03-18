@@ -29,7 +29,7 @@ def get_review():
 - Review the code changes (diffs) and provide feedback.
 - If there are any bugs, highlight them.
 - Do not highlight minor issues and nitpicks.
-- View this as one pull request and don't mention individual patches.
+- Summarize all the patches as one pull request, do not mention them individually
 - Look out for typos in repeating variables.\n- Use markdown formatting.
 - Use bullet points if you have multiple comments.
 {extra_tasks}
