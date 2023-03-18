@@ -1,4 +1,4 @@
-name: 'GPTReviewWorkflow'
+name: 'action-gpt'
 description: 'GPT-3 reviews your PR'
 branding:
   icon: 'eye'
