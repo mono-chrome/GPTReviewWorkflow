@@ -2,6 +2,7 @@
 import logging
 import json
 import os
+import time
 import requests
 import openai
 import sys
@@ -90,6 +91,7 @@ def call_gpt4(
     top_p=1,
     frequency_penalty=0.5,
     presence_penalty=0.0,
+    retry=0,
 ) -> str:
     try:
         engine = "gpt-4-32k"
@@ -105,8 +107,13 @@ def call_gpt4(
             presence_penalty=presence_penalty,
         )
         return completion.choices[0].message.content
-    except (RateLimitError, InvalidRequestError):
+    except InvalidRequestError:
         return call_gpt3(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+    except RateLimitError as error:
+        if retry < 5:
+            time.sleep(retry * 5)
+            return call_gpt4(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, retry + 1)
+        raise RateLimitError("Retry limit exceeded") from error
 
 
 def call_gpt(
