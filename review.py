@@ -6,7 +6,7 @@ import requests
 import openai
 import sys
 
-from openai.error import RateLimitError
+from openai.error import RateLimitError, InvalidRequestError
 
 
 class GitFile:
@@ -79,8 +79,34 @@ def call_gpt3(
         )
         logging.info(completion.choices[0].message.content)
         return completion.choices[0].message.content
-    except RateLimitError:
+    except (RateLimitError, InvalidRequestError):
         return call_davinci(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+
+
+def call_gpt4(
+    prompt: str,
+    temperature=0.10,
+    max_tokens=500,
+    top_p=1,
+    frequency_penalty=0.5,
+    presence_penalty=0.0,
+) -> str:
+    try:
+        engine = "gpt-4-32k"
+
+        logging.info(f"\nPrompt sent to GPT-4: {prompt}\n")
+        completion = openai.ChatCompletion.create(
+            engine=engine,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+        )
+        return completion.choices[0].message.content
+    except (RateLimitError, InvalidRequestError):
+        return call_gpt3(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
 
 
 def call_gpt(
@@ -93,25 +119,14 @@ def call_gpt(
 ) -> str:
     if os.getenv("AZURE_OPENAI_API_KEY"):
         openai.api_type = "azure"
-        openai.api_base = os.getenv("AZURE_OPENAI_API", "https://synapseml-openai.openai.azure.com/")
+        openai.api_base = os.getenv("AZURE_OPENAI_API")
         openai.api_version = "2023-03-15-preview"
         openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        engine = "gpt-4-32k"
-    else:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        engine = "gpt-3-turbo"
 
-    logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
-    completion = openai.ChatCompletion.create(
-        engine=engine,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=max_tokens,
-        top_p=top_p,
-        frequency_penalty=frequency_penalty,
-        presence_penalty=presence_penalty,
-    )
-    return completion.choices[0].message.content
+        return call_gpt4(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    return call_gpt3(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
 
 
 def split_diff(git_diff):

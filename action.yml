@@ -45,16 +45,15 @@ runs:
           python3 -m venv .env
           source .env/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install flit>=3.8.0
-
-          cd $GITHUB_ACTION_PATH
-
-          python -m flit install --only-deps --deps production
+          python -m pip install requests openai
 
       - name: Review PR and make comment
         shell: bash
         run: |
           source .env/bin/activate
+
+          curl --request GET --url https://raw.githubusercontent.com/dciborow/action-gpt/main/review.py > review.py
+
           python review.py
         env:
           GIT_COMMIT_HASH: ${{ inputs.GIT_COMMIT_HASH }}
