@@ -4,6 +4,11 @@ import json
 import subprocess  # is this still needed?
 import openai
 
+def chunks(s, n):
+    """Produce `n`-character chunks from `s`."""
+    for start in range(0, len(s), n):
+        yield s[start:start+n]
+
 
 def get_review():
     ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -21,8 +26,7 @@ def get_review():
     }
 
     intro = f"Act as a code reviewer of a Pull Request, providing feedback on the code changes below. You are provided with the Pull Request changes in a patch format.\n"
-    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"
-    patch_info = f"Patch of the Pull Request to review:\n\n{PR_PATCH}\n"
+    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"    
     task_headline = "As a code reviewer, your task is:"
     task_list = f"""
 - Provide a summary of the changes that can be used in the changelog
@@ -34,20 +38,24 @@ def get_review():
 - Use bullet points if you have multiple comments.
 {extra_tasks}
 """
-    prompt = intro + explanation + patch_info + task_headline + task_list
+    review = ''
+    for pr_patch_chunk in chunks(PR_PATCH, 3000):
+        print chunk
+        patch_info = f"Patch of the Pull Request to review:\n\n{PR_PATCH}\n"
+        prompt = intro + explanation + patch_info + task_headline + task_list
 
-    print(f"\nPrompt sent to GPT-3: {prompt}\n")
+        print(f"\nPrompt sent to GPT-3: {prompt}\n")
 
-    response = openai.Completion.create(
-        engine=model,
-        prompt=prompt,
-        temperature=0.55,
-        max_tokens=312,
-        top_p=1,
-        frequency_penalty=0.3,
-        presence_penalty=0.0,
-    )
-    review = response["choices"][0]["text"]
+        response = openai.Completion.create(
+            engine=model,
+            prompt=prompt,
+            temperature=0.55,
+            max_tokens=312,
+            top_p=1,
+            frequency_penalty=0.3,
+            presence_penalty=0.0,
+        )
+        review += response["choices"][0]["text"]
 
     data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
     data = json.dumps(data)
