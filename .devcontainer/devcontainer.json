@@ -18,7 +18,8 @@
 				"ms-vsliveshare.vsliveshare",
 				"ryanluker.vscode-coverage-gutters",
 				"bungcip.better-toml",
-				"GitHub.copilot"
+				"GitHub.copilot",
+				"GitHub.vscode-github-actions"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -36,6 +37,5 @@
 				]
 			}
 		}
-	},
-	"onCreateCommand": "pre-commit install-hooks"
+	}
 }

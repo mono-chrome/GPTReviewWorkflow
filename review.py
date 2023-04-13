@@ -40,8 +40,7 @@ def get_review():
 """
     review = ''
     for pr_patch_chunk in chunks(PR_PATCH, 3000):
-        print chunk
-        patch_info = f"Patch of the Pull Request to review:\n\n{PR_PATCH}\n"
+        patch_info = f"Patch of the Pull Request to review:\n\n{pr_patch_chunk}\n"
         prompt = intro + explanation + patch_info + task_headline + task_list
 
         print(f"\nPrompt sent to GPT-3: {prompt}\n")
