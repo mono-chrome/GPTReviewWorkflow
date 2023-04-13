@@ -186,7 +186,7 @@ Are the changes tested?
 ```
 """
 
-    return call_gpt(prompt, temperature=0.0, max_tokens=1000)
+    return call_gpt(prompt, temperature=0.0, max_tokens=1500)
 
 
 def summarize_file(diff):
