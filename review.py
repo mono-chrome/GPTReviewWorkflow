@@ -1,20 +1,27 @@
+import logging
 import os
 import requests
 import json
 import subprocess  # is this still needed?
 import openai
 
+
 def chunks(s, n):
     """Produce `n`-character chunks from `s`."""
     for start in range(0, len(s), n):
-        yield s[start:start+n]
+        yield s[start : start + n]
+
+
+def splits(s):
+    for commit in s.split("From: "):
+        # for split in commit.split("diff"):
+        yield chunks(commit, 3000)
 
 
 def get_review():
     ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
     GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
     PR_PATCH = os.getenv("GIT_PATCH_OUTPUT")
-    model = os.getenv("GPT_MODEL", "text-davinci-003")
     openai.api_key = os.getenv("OPENAI_API_KEY")
     openai.organization = os.getenv("OPENAI_ORG_KEY")
     pr_link = os.getenv("LINK")
@@ -26,7 +33,7 @@ def get_review():
     }
 
     intro = f"Act as a code reviewer of a Pull Request, providing feedback on the code changes below. You are provided with the Pull Request changes in a patch format.\n"
-    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"    
+    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"
     task_headline = "As a code reviewer, your task is:"
     task_list = f"""
 - Provide a summary of the changes that can be used in the changelog
@@ -38,27 +45,16 @@ def get_review():
 - Use bullet points if you have multiple comments.
 {extra_tasks}
 """
-    review = ''
+    review = ""
     for pr_patch_chunk in chunks(PR_PATCH, 3000):
         patch_info = f"Patch of the Pull Request to review:\n\n{pr_patch_chunk}\n"
         prompt = intro + explanation + patch_info + task_headline + task_list
 
-        print(f"\nPrompt sent to GPT-3: {prompt}\n")
-
-        response = openai.Completion.create(
-            engine=model,
-            prompt=prompt,
-            temperature=0.55,
-            max_tokens=312,
-            top_p=1,
-            frequency_penalty=0.3,
-            presence_penalty=0.0,
-        )
-        review += response["choices"][0]["text"]
+        review += call_gpt(prompt)
 
     data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
     data = json.dumps(data)
-    print(f"\nResponse from GPT-3: {data}\n")
+    logging.info(f"\nResponse from GPT-3: {data}\n")
 
     OWNER = pr_link.split("/")[-4]
     REPO = pr_link.split("/")[-3]
@@ -70,7 +66,23 @@ def get_review():
         headers=headers,
         data=data,
     )
-    print(response.json())
+    logging.info(response.json())
+
+
+def call_gpt(prompt: str) -> str:
+    model = os.getenv("GPT_MODEL", "text-davinci-003")
+
+    logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+    response = openai.Completion.create(
+        engine=model,
+        prompt=prompt,
+        temperature=0.10,
+        max_tokens=312,
+        top_p=1,
+        frequency_penalty=0.5,
+        presence_penalty=0.0,
+    )
+    return response["choices"][0]["text"]
 
 
 if __name__ == "__main__":
