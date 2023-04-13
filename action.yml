@@ -7,9 +7,6 @@ inputs:
   GIT_COMMIT_HASH:
     description: 'SHA of the pull request-head to attach a review comment'
     required: true
-  GIT_PATCH_OUTPUT:
-    description: 'The pull request in patch format for prompt interpretation'
-    required: true
   GITHUB_TOKEN:
     description: 'Derivative token for using the GitHub REST API'
     required: true
@@ -28,6 +25,12 @@ inputs:
   REPOSITORY_NAME:
     description: 'The repository name (ie: octocat/hello-world)'
     required: true
+  AZURE_OPENAI_API:
+    description: 'URL of custom Azure Open AI API'
+    required: false
+  AZURE_OPENAI_API_KEY:
+    description: 'Key of custom Azure Open AI API'
+    required: false
 runs:
   using: "composite"
   steps:
@@ -41,13 +44,13 @@ runs:
           sudo apt-get update
           python3 -m venv .env
           source .env/bin/activate
-          python -m pip install -U pip
-          pip install openai
-          pip install requests
-      - name: Fetch review logic
-        uses: wei/wget@v1
-        with:
-          args: -O review.py https://raw.githubusercontent.com/mono-chrome/GPTReviewWorkflow/main/review.py
+          python -m pip install --upgrade pip
+          python -m pip install flit>=3.8.0
+
+          cd $GITHUB_ACTION_PATH
+
+          python -m flit install --only-deps --deps production
+
       - name: Review PR and make comment
         shell: bash
         run: |
@@ -55,10 +58,12 @@ runs:
           python review.py
         env:
           GIT_COMMIT_HASH: ${{ inputs.GIT_COMMIT_HASH }}
-          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
           LINK: "https://github.com/${{ inputs.REPOSITORY_NAME }}/pull/${{ inputs.PR_NUMBER }}"
-          OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }} 
-          OPENAI_ORG_KEY: ${{ inputs.OPENAI_ORG_KEY }} 
+          OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }}
+          OPENAI_ORG_KEY: ${{ inputs.OPENAI_ORG_KEY }}
           PR_TITLE: ${{ inputs.PR_TITLE }}
-          GIT_PATCH_OUTPUT: ${{ inputs.GIT_PATCH_OUTPUT }}
-
+          AZURE_OPENAI_API_KEY: ${{ inputs.AZURE_OPENAI_API_KEY || '' }}
+          AZURE_OPENAI_API: ${{ inputs.AZURE_OPENAI_API || '' }}
+          PATCH_PR: ${{ github.event.pull_request.number }}
+          PATCH_REPO: ${{ github.repository }}

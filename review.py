@@ -1,68 +1,256 @@
+"""Review GitHub PR using Open AI Models like Davinci-003, GPT-3 and GPT-4."""
+import logging
+import json
 import os
 import requests
-import json
-import subprocess  # is this still needed?
 import openai
+import sys
+
+from openai.error import RateLimitError
+
+
+class GitFile:
+    """A git file with its diff contents."""
+
+    def __init__(self, file_name, diff):
+        """Initialize a GitFile object.
+
+        Args:
+            file_name (str): The name of the file.
+            diff (str): The diff contents of the file.
+        """
+        self.file_name = file_name
+        self.diff = diff
+
 
 def chunks(s, n):
     """Produce `n`-character chunks from `s`."""
     for start in range(0, len(s), n):
-        yield s[start:start+n]
+        yield s[start : start + n]
 
 
-def get_review():
-    ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
-    GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
-    PR_PATCH = os.getenv("GIT_PATCH_OUTPUT")
+def splits(s):
+    for commit in s.split("From: "):
+        # for split in commit.split("diff"):
+        yield chunks(commit, 3000)
+
+
+def call_davinci(
+    prompt: str,
+    temperature=0.10,
+    max_tokens=312,
+    top_p=1,
+    frequency_penalty=0.5,
+    presence_penalty=0.0,
+) -> str:
     model = os.getenv("GPT_MODEL", "text-davinci-003")
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    openai.organization = os.getenv("OPENAI_ORG_KEY")
-    pr_link = os.getenv("LINK")
-    extra_tasks = os.getenv("EXTRA_TASKS", "")
 
-    headers = {
-        "Accept": "application/vnd.github.v3.patch",
-        "authorization": f"Bearer {ACCESS_TOKEN}",
-    }
+    logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+    response = openai.Completion.create(
+        engine=model,
+        prompt=prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        top_p=top_p,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
+    )
+    return response["choices"][0]["text"]
 
-    intro = f"Act as a code reviewer of a Pull Request, providing feedback on the code changes below. You are provided with the Pull Request changes in a patch format.\n"
-    explanation = f"Each patch entry has the commit message in the Subject line followed by the code changes (diffs) in a unidiff format.\n"    
-    task_headline = "As a code reviewer, your task is:"
-    task_list = f"""
-- Provide a summary of the changes that can be used in the changelog
-- Review the code changes (diffs) and provide feedback.
-- If there are any bugs, highlight them.
-- Do not highlight minor issues and nitpicks.
-- Summarize all the patches as one pull request, do not mention them individually
-- Look out for typos in repeating variables.\n- Use markdown formatting.
-- Use bullet points if you have multiple comments.
-{extra_tasks}
-"""
-    review = ''
-    for pr_patch_chunk in chunks(PR_PATCH, 3000):
-        patch_info = f"Patch of the Pull Request to review:\n\n{pr_patch_chunk}\n"
-        prompt = intro + explanation + patch_info + task_headline + task_list
 
-        print(f"\nPrompt sent to GPT-3: {prompt}\n")
-
-        response = openai.Completion.create(
-            engine=model,
-            prompt=prompt,
-            temperature=0.55,
-            max_tokens=312,
-            top_p=1,
-            frequency_penalty=0.3,
-            presence_penalty=0.0,
+def call_gpt3(
+    prompt: str,
+    temperature=0.10,
+    max_tokens=312,
+    top_p=1,
+    frequency_penalty=0.5,
+    presence_penalty=0.0,
+) -> str:
+    try:
+        logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
         )
-        review += response["choices"][0]["text"]
+        logging.info(completion.choices[0].message.content)
+        return completion.choices[0].message.content
+    except RateLimitError:
+        return call_davinci(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
 
+
+def call_gpt(
+    prompt: str,
+    temperature=0.10,
+    max_tokens=500,
+    top_p=1,
+    frequency_penalty=0.5,
+    presence_penalty=0.0,
+) -> str:
+    if os.getenv("AZURE_OPENAI_API_KEY"):
+        openai.api_type = "azure"
+        openai.api_base = os.getenv("AZURE_OPENAI_API", "https://synapseml-openai.openai.azure.com/")
+        openai.api_version = "2023-03-15-preview"
+        openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        engine = "gpt-4-32k"
+    else:
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        engine = "gpt-3-turbo"
+
+    logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+    completion = openai.ChatCompletion.create(
+        engine=engine,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=max_tokens,
+        top_p=top_p,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
+    )
+    return completion.choices[0].message.content
+
+
+def split_diff(git_diff):
+    """Split a git diff into a list of files and their diff contents.
+
+    Args:
+        git_diff (str): The git diff to split.
+
+    Returns:
+        list: A list of tuples containing the file name and diff contents.
+    """
+    diff = "diff"
+    git = "--git a/"
+    return git_diff.split(f"{diff} {git}")[1:]  # Use formated string to prevent splitting
+
+
+def _analyze_test_coverage_bicep(files):
+    main_file = files["main.bicep"].diff
+    test_file = files["main.test.bicep"].diff if "main.test.bicep" in files else ""
+
+    return f"""
+    Are the changes in main.bicep tested in main.test.bicep?
+    If not, provide ideas how to test the changes, and create more tests in main.test.bicep.
+    main.bicep
+    ```
+    {main_file}
+    ```
+    main.test.bicep
+    ```
+    {test_file}
+    ```
+    """
+
+
+def summarize_test_coverage(git_diff):
+    files = {}
+    for diff in split_diff(git_diff):
+        path = diff.split(" b/")[0]
+        git_file = GitFile(path.split("/")[len(path.split("/")) - 1], diff)
+
+        files[git_file.file_name] = git_file
+
+    if "main.bicep" in files:
+        prompt = _analyze_test_coverage_bicep(files)
+    else:
+        prompt = f"""
+Are the changes tested?
+```
+{git_diff}
+```
+"""
+
+    return call_gpt(prompt, temperature=0.0, max_tokens=1000)
+
+
+def summarize_file(diff):
+    git_file = GitFile(diff.split(" b/")[0], diff)
+    prompt = f"""
+Summarize the changes to the file {git_file.file_name}.
+- Do not include the file name in the summary.
+- list the summary with bullet points
+{diff}
+"""
+    response = call_gpt(prompt, temperature=0.0)
+    return f"""
+### {git_file.file_name}
+{response}
+"""
+
+
+def summarize_pr(git_diff):
+    # Summarize the changes in this GitHub diff report.
+    gpt4_big_prompot = f"""
+{git_diff}
+"""
+    response = call_gpt(gpt4_big_prompot)
+    logging.info(response)
+    return response
+
+
+def summarize_bugs_in_pr(git_diff):
+    # Summarize any bugs that may be introduced in this GitHub diff report.
+    gpt4_big_prompot = f"""
+Summarize bugs that may be introduced.
+
+{git_diff}
+"""
+    response = call_gpt(gpt4_big_prompot)
+    logging.info(response)
+    return response
+
+
+def summarize_files(git_diff):
+    """Summarize git files."""
+    summary = f"""
+# Summary
+{summarize_pr(git_diff)}
+## Changes
+"""
+
+    for diff in split_diff(git_diff):
+        summary += summarize_file(diff)
+
+    summary += f"""
+## Test Coverage
+{summarize_test_coverage(git_diff)}
+
+## Potential Bugs
+{summarize_bugs_in_pr(git_diff)}
+"""
+    return summary
+
+
+def get_review(pr_patch):
+    review = summarize_files(pr_patch)
+    print(review)
+
+    if os.getenv("LINK"):
+        _post_pr_comment(review)
+    else:
+        logging.warning("No PR to post too")
+
+
+def _post_pr_comment(review):
+    GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
     data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
     data = json.dumps(data)
-    print(f"\nResponse from GPT-3: {data}\n")
+    logging.info(f"\nResponse from GPT-4: {data}\n")
 
+    pr_link = os.getenv("LINK")
     OWNER = pr_link.split("/")[-4]
     REPO = pr_link.split("/")[-3]
     PR_NUMBER = pr_link.split("/")[-1]
+
+    ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
+    headers = {
+        "Accept": "application/vnd.github.v3.diff",
+        "authorization": f"Bearer {ACCESS_TOKEN}",
+    }
 
     # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
     response = requests.post(
@@ -70,8 +258,31 @@ def get_review():
         headers=headers,
         data=data,
     )
-    print(response.json())
+    logging.info(response.json())
+
+
+def _get_pr_diff():
+    """
+    Replicate the logic from this command
+
+    PATCH_OUTPUT=$(curl --silent --request GET \
+        --url https://api.github.com/repos/$PATCH_REPO/pulls/$PATCH_PR \
+        --header "Accept: application/vnd.github.diff" \
+        --header "Authorization: Bearer $GITHUB_TOKEN")
+    """
+    patch_repo = os.getenv("PATCH_REPO")
+    patch_pr = os.getenv("PATCH_PR")
+    access_token = os.getenv("GITHUB_TOKEN")
+
+    headers = {
+        "Accept": "application/vnd.github.v3.diff",
+        "authorization": f"Bearer {access_token}",
+    }
+
+    response = requests.get(f"https://api.github.com/repos/{patch_repo}/pulls/{patch_pr}", headers=headers)
+    return response.text
 
 
 if __name__ == "__main__":
-    get_review()
+    pr_notes = _get_pr_diff() if len(sys.argv) == 1 else sys.argv[1]
+    get_review(pr_notes)
