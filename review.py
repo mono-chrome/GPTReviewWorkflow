@@ -3,9 +3,9 @@ import logging
 import json
 import os
 import time
+import sys
 import requests
 import openai
-import sys
 
 from openai.error import RateLimitError, InvalidRequestError
 
@@ -24,14 +24,30 @@ class GitFile:
         self.diff = diff
 
 
-def chunks(s, n):
-    """Produce `n`-character chunks from `s`."""
-    for start in range(0, len(s), n):
-        yield s[start : start + n]
+def chunks(string, length):
+    """Split a string into chunks of a given length.
+
+    Args:
+        string (str): The string to split.
+        length (int): The length of the chunks.
+
+    Yields:
+        str: A chunk of the string.
+    """
+    for start in range(0, len(string), length):
+        yield string[start : start + length]
 
 
-def splits(s):
-    for commit in s.split("From: "):
+def splits(string):
+    """Split a string into chunks of 3000 characters.
+
+    Args:
+        string (str): The string to split.
+
+    Yields:
+        str: A chunk of the string.
+    """
+    for commit in string.split("From: "):
         # for split in commit.split("diff"):
         yield chunks(commit, 3000)
 
@@ -44,9 +60,22 @@ def call_davinci(
     frequency_penalty=0.5,
     presence_penalty=0.0,
 ) -> str:
+    """Call the Davinci-003 model.
+
+    Args:
+        prompt (str): The prompt to send to GPT-3.
+        temperature (float, optional): The temperature of the model. Defaults to 0.10.
+        max_tokens (int, optional): The maximum number of tokens to return. Defaults to 312.
+        top_p (float, optional): The top_p of the model. Defaults to 1.
+        frequency_penalty (float, optional): The frequency penalty of the model. Defaults to 0.5.
+        presence_penalty (float, optional): The presence penalty of the model. Defaults to 0.0.
+
+    Returns:
+        str: The response from the model.
+    """
     model = os.getenv("GPT_MODEL", "text-davinci-003")
 
-    logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+    logging.info("\nPrompt sent to GPT-3: %s", prompt)
     response = openai.Completion.create(
         engine=model,
         prompt=prompt,
@@ -66,9 +95,24 @@ def call_gpt3(
     top_p=1,
     frequency_penalty=0.5,
     presence_penalty=0.0,
+    retry=0,
 ) -> str:
+    """Call the GPT-3 model.
+
+    Args:
+        prompt (str): The prompt to send to GPT-3.
+        temperature (float, optional): The temperature of the model. Defaults to 0.10.
+        max_tokens (int, optional): The maximum number of tokens to return. Defaults to 312.
+        top_p (float, optional): The top_p of the model. Defaults to 1.
+        frequency_penalty (float, optional): The frequency penalty of the model. Defaults to 0.5.
+        presence_penalty (float, optional): The presence penalty of the model. Defaults to 0.0.
+        retry (int, optional): The number of retries. Defaults to 0.
+
+    Returns:
+        str: The response from the model.
+    """
     try:
-        logging.info(f"\nPrompt sent to GPT-3: {prompt}\n")
+        logging.info("\nPrompt sent to GPT-3: %s\n", prompt)
         completion = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
@@ -80,8 +124,42 @@ def call_gpt3(
         )
         logging.info(completion.choices[0].message.content)
         return completion.choices[0].message.content
-    except (RateLimitError, InvalidRequestError):
+    except InvalidRequestError as error:
+        if retry < 5:
+            time.sleep(retry * 5)
+            return call_gpt3(
+                prompt[:4097], temperature, max_tokens, top_p, frequency_penalty, presence_penalty, retry + 1
+            )
+        raise InvalidRequestError("Retry limit exceeded", error.param, error.code) from error
+    except RateLimitError:
         return call_davinci(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+
+
+def _batch_gpt3(prompt: str) -> str:
+    """Call GPT-3 in batches to avoid rate limit errors.
+
+    Args:
+        prompt (str): The prompt to send to GPT-3.
+        batch_size (int, optional): The number of prompts to send at once. Defaults to 1.
+
+    Returns:
+        str: The response from GPT-3.
+    """
+    responses = "".join(
+        call_gpt3(
+            f"""
+{chunk}
+"""
+        )
+        for chunk in chunks(prompt, 4096)
+    )
+    return call_gpt3(
+        f"""
+Merge these pieces of text.
+
+${responses}
+"""
+    )
 
 
 def call_gpt4(
@@ -93,10 +171,29 @@ def call_gpt4(
     presence_penalty=0.0,
     retry=0,
 ) -> str:
+    """
+    Call GPT-4 with the given prompt.
+
+    Args:
+        prompt (str): The prompt to send to GPT-4.
+        temperature (float, optional): The temperature to use. Defaults to 0.10.
+        max_tokens (int, optional): The maximum number of tokens to generate. Defaults to 500.
+        top_p (float, optional): The top_p to use. Defaults to 1.
+        frequency_penalty (float, optional): The frequency penalty to use. Defaults to 0.5.
+        presence_penalty (float, optional): The presence penalty to use. Defaults to 0.0.
+        retry (int, optional): The number of times to retry the request. Defaults to 0.
+
+    Returns:
+        str: The response from GPT-4.
+    """
     try:
         engine = "gpt-4-32k"
 
-        logging.info(f"\nPrompt sent to GPT-4: {prompt}\n")
+        if len(prompt) > 32767:
+            logging.warning("Prompt too long, truncating")
+            prompt = prompt[:32767]
+
+        logging.info("Prompt sent to GPT-4: %s\n", prompt)
         completion = openai.ChatCompletion.create(
             engine=engine,
             messages=[{"role": "user", "content": prompt}],
@@ -108,7 +205,7 @@ def call_gpt4(
         )
         return completion.choices[0].message.content
     except InvalidRequestError:
-        return call_gpt3(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+        return call_gpt4(prompt[:32767], temperature, max_tokens, top_p, frequency_penalty, presence_penalty, retry + 1)
     except RateLimitError as error:
         if retry < 5:
             time.sleep(retry * 5)
@@ -124,6 +221,19 @@ def call_gpt(
     frequency_penalty=0.5,
     presence_penalty=0.0,
 ) -> str:
+    """Call GPT-3 or GPT-4 depending on the model.
+
+    Args:
+        prompt (str): The prompt to send to GPT-3 or GPT-4.
+        temperature (float, optional): The temperature to use. Defaults to 0.10.
+        max_tokens (int, optional): The maximum number of tokens to generate. Defaults to 500.
+        top_p (float, optional): The top_p to use. Defaults to 1.
+        frequency_penalty (float, optional): The frequency penalty to use. Defaults to 0.5.
+        presence_penalty (float, optional): The presence penalty to use. Defaults to 0.0.
+
+    Returns:
+        str: The response from GPT-3 or GPT-4.
+    """
     if os.getenv("AZURE_OPENAI_API_KEY"):
         openai.api_type = "azure"
         openai.api_base = os.getenv("AZURE_OPENAI_API")
@@ -169,6 +279,14 @@ def _analyze_test_coverage_bicep(files):
 
 
 def summarize_test_coverage(git_diff):
+    """Summarize the test coverage of a git diff.
+
+    Args:
+        git_diff (str): The git diff to summarize.
+
+    Returns:
+        str: The summary of the test coverage.
+    """
     files = {}
     for diff in split_diff(git_diff):
         path = diff.split(" b/")[0]
@@ -190,6 +308,14 @@ Are the changes tested?
 
 
 def summarize_file(diff):
+    """Summarize a file in a git diff.
+
+    Args:
+        diff (str): The file to summarize.
+
+    Returns:
+        str: The summary of the file.
+    """
     git_file = GitFile(diff.split(" b/")[0], diff)
     prompt = f"""
 Summarize the changes to the file {git_file.file_name}.
@@ -205,7 +331,14 @@ Summarize the changes to the file {git_file.file_name}.
 
 
 def summarize_pr(git_diff):
-    # Summarize the changes in this GitHub diff report.
+    """Summarize a git diff.
+
+    Args:
+        git_diff (str): The git diff to summarize.
+
+    Returns:
+        str: The summary of the git diff.
+    """
     gpt4_big_prompot = f"""
 {git_diff}
 """
@@ -215,7 +348,15 @@ def summarize_pr(git_diff):
 
 
 def summarize_bugs_in_pr(git_diff):
-    # Summarize any bugs that may be introduced in this GitHub diff report.
+    """
+    Summarize bugs that may be introduced.
+
+    Args:
+        git_diff (str): The git diff to split.
+
+    Returns:
+        response (str): The response from GPT-4.
+    """
     gpt4_big_prompot = f"""
 Summarize bugs that may be introduced.
 
@@ -248,6 +389,15 @@ def summarize_files(git_diff):
 
 
 def get_review(pr_patch):
+    """Get a review of a PR.
+
+    Args:
+        pr_patch (str): The patch of the PR.
+
+    Returns:
+        str: The review of the PR.
+    """
+
     review = summarize_files(pr_patch)
     print(review)
 
@@ -258,22 +408,22 @@ def get_review(pr_patch):
 
 
 def _post_pr_comment(review):
-    GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
-    data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
+    git_commit_hash = os.getenv("GIT_COMMIT_HASH")
+    data = {"body": review, "commit_id": git_commit_hash, "event": "COMMENT"}
     data = json.dumps(data)
 
     pr_link = os.getenv("LINK")
-    OWNER = pr_link.split("/")[-4]
-    REPO = pr_link.split("/")[-3]
-    PR_NUMBER = pr_link.split("/")[-1]
+    owner = pr_link.split("/")[-4]
+    repo = pr_link.split("/")[-3]
+    pr_number = pr_link.split("/")[-1]
 
-    ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
+    access_token = os.getenv("GITHUB_TOKEN")
     headers = {
         "Accept": "application/vnd.github+json",
-        "authorization": f"Bearer {ACCESS_TOKEN}",
+        "authorization": f"Bearer {access_token}",
     }
     response = requests.get(
-        f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews", headers=headers, timeout=10
+        f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews", headers=headers, timeout=10
     )
     comments = response.json()
 
@@ -289,7 +439,7 @@ def _post_pr_comment(review):
             data = json.dumps(data)
 
             response = requests.put(
-                f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews/{review_id}",
+                f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews/{review_id}",
                 headers=headers,
                 data=data,
                 timeout=10,
@@ -299,7 +449,7 @@ def _post_pr_comment(review):
     else:
         # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
         response = requests.post(
-            f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews",
+            f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
             headers=headers,
             data=data,
             timeout=10,
@@ -330,5 +480,4 @@ def _get_pr_diff():
 
 
 if __name__ == "__main__":
-    pr_notes = _get_pr_diff() if len(sys.argv) == 1 else sys.argv[1]
-    get_review(pr_notes)
+    get_review(_get_pr_diff() if len(sys.argv) == 1 else sys.argv[1])
