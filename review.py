@@ -229,7 +229,7 @@ Summarize bugs that may be introduced.
 def summarize_files(git_diff):
     """Summarize git files."""
     summary = f"""
-# Summary
+# Summary by GPT-4
 {summarize_pr(git_diff)}
 ## Changes
 """
@@ -261,7 +261,6 @@ def _post_pr_comment(review):
     GIT_COMMIT_HASH = os.getenv("GIT_COMMIT_HASH")
     data = {"body": review, "commit_id": GIT_COMMIT_HASH, "event": "COMMENT"}
     data = json.dumps(data)
-    logging.info(f"\nResponse from GPT-4: {data}\n")
 
     pr_link = os.getenv("LINK")
     OWNER = pr_link.split("/")[-4]
@@ -270,17 +269,42 @@ def _post_pr_comment(review):
 
     ACCESS_TOKEN = os.getenv("GITHUB_TOKEN")
     headers = {
-        "Accept": "application/vnd.github.v3.diff",
+        "Accept": "application/vnd.github+json",
         "authorization": f"Bearer {ACCESS_TOKEN}",
     }
-
-    # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
-    response = requests.post(
-        f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews",
-        headers=headers,
-        data=data,
+    response = requests.get(
+        f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews", headers=headers, timeout=10
     )
-    logging.info(response.json())
+    comments = response.json()
+
+    for comment in comments:
+        if (
+            "user" in comment
+            and comment["user"]["login"] == "github-actions[bot]"
+            and "body" in comment
+            and "Summary by GPT-4" in comment["body"]
+        ):
+            review_id = comment["id"]
+            data = {"body": review}
+            data = json.dumps(data)
+
+            response = requests.put(
+                f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews/{review_id}",
+                headers=headers,
+                data=data,
+                timeout=10,
+            )
+            logging.info(response.json())
+            break
+    else:
+        # https://api.github.com/repos/OWNER/REPO/pulls/PULL_NUMBER/reviews
+        response = requests.post(
+            f"https://api.github.com/repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/reviews",
+            headers=headers,
+            data=data,
+            timeout=10,
+        )
+        logging.info(response.json())
 
 
 def _get_pr_diff():
@@ -301,7 +325,7 @@ def _get_pr_diff():
         "authorization": f"Bearer {access_token}",
     }
 
-    response = requests.get(f"https://api.github.com/repos/{patch_repo}/pulls/{patch_pr}", headers=headers)
+    response = requests.get(f"https://api.github.com/repos/{patch_repo}/pulls/{patch_pr}", headers=headers, timeout=10)
     return response.text
 
 
