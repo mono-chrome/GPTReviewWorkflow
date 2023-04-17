@@ -170,6 +170,7 @@ def call_gpt4(
     frequency_penalty=0.5,
     presence_penalty=0.0,
     retry=0,
+    system=None,
 ) -> str:
     """
     Call GPT-4 with the given prompt.
@@ -196,7 +197,7 @@ def call_gpt4(
         logging.info("Prompt sent to GPT-4: %s\n", prompt)
         completion = openai.ChatCompletion.create(
             engine=engine,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[system or {}, {"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
@@ -220,6 +221,7 @@ def call_gpt(
     top_p=1,
     frequency_penalty=0.5,
     presence_penalty=0.0,
+    system=None,
 ) -> str:
     """Call GPT-3 or GPT-4 depending on the model.
 
@@ -240,7 +242,7 @@ def call_gpt(
         openai.api_version = "2023-03-15-preview"
         openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 
-        return call_gpt4(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)
+        return call_gpt4(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, system=system)
 
     openai.api_key = os.getenv("OPENAI_API_KEY")
     return call_gpt3(prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty)

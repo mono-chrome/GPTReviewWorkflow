@@ -1,0 +1,116 @@
+```bicep
+@description('Specifies whether to deploy Azure Databricks workspace with Secure Cluster Connectivity (No Public IP) enabled or not')
+param disablePublicIp bool = false
+
+@description('The name of the Azure Databricks workspace to create.')
+param workspaceName string
+
+@description('The pricing tier of workspace.')
+@allowed([
+  'standard'
+  'premium'
+])
+param pricingTier string = 'premium'
+
+@description('Location for all resources.')
+param location string = resourceGroup().location
+
+var managedResourceGroupName = 'databricks-rg-${workspaceName}-${uniqueString(workspaceName, resourceGroup().id)}'
+var trimmedMRGName = substring(managedResourceGroupName, 0, min(length(managedResourceGroupName), 90))
+var managedResourceGroupId = '${subscription().id}/resourceGroups/${trimmedMRGName}'
+
+resource workspace 'Microsoft.Databricks/workspaces@2023-02-01' = {
+  name: workspaceName
+  location: location
+  sku: {
+    name: pricingTier
+  }
+  properties: {
+    managedResourceGroupId: managedResourceGroupId
+    parameters: {
+      enableNoPublicIp: {
+        value: disablePublicIp
+      }
+    }
+  }
+}
+
+output workspace object = workspace
+```
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.15.31.15270",
+      "templateHash": "9933787255903776952"
+    }
+  },
+  "parameters": {
+    "disablePublicIp": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Specifies whether to deploy Azure Databricks workspace with Secure Cluster Connectivity (No Public IP) enabled or not"
+      }
+    },
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Azure Databricks workspace to create."
+      }
+    },
+    "pricingTier": {
+      "type": "string",
+      "defaultValue": "premium",
+      "allowedValues": [
+        "standard",
+        "premium"
+      ],
+      "metadata": {
+        "description": "The pricing tier of workspace."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    }
+  },
+  "variables": {
+    "managedResourceGroupName": "[format('databricks-rg-{0}-{1}', parameters('workspaceName'), uniqueString(parameters('workspaceName'), resourceGroup().id))]",
+    "trimmedMRGName": "[substring(variables('managedResourceGroupName'), 0, min(length(variables('managedResourceGroupName')), 90))]",
+    "managedResourceGroupId": "[format('{0}/resourceGroups/{1}', subscription().id, variables('trimmedMRGName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Databricks/workspaces",
+      "apiVersion": "2023-02-01",
+      "name": "[parameters('workspaceName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('pricingTier')]"
+      },
+      "properties": {
+        "managedResourceGroupId": "[variables('managedResourceGroupId')]",
+        "parameters": {
+          "enableNoPublicIp": {
+            "value": "[parameters('disablePublicIp')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "workspace": {
+      "type": "object",
+      "value": "[reference(resourceId('Microsoft.Databricks/workspaces', parameters('workspaceName')), '2023-02-01', 'full')]"
+    }
+  }
+}
+```
